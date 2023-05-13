@@ -1,16 +1,18 @@
 # API - AIzaSyDQTfAOLcUNuKOOSS7gI1aZ9ylfwGivupw
-from fastAPI import FastAPI, UploadFile, HTTPException, Form
+from fastapi import File, UploadFile, Form, HTTPException
 # from pydantic import BaseModel
 from google.cloud import storage, bigquery
 from typing import Annotated
-
+import sys
+print(sys.path)
 app = FastAPI()
 client = bigquery.Client()
 
 
 # class CSV(BaseModel):
 # Service account key for Google Cloud authentication
-#   gcloud_service_account_key: str
+#    gcloud_service_account_key: Annotated[str, Form()]
+
 #    csv_id: str  # ID associated with the uploaded CSV file
 
 
@@ -19,6 +21,7 @@ def csv_upload(
     gcloud_service_api_key: Annotated[str, Form()],
     csv_id: Annotated[str, Form()],
     csv: UploadFile,
+    query: str
 ):
 
     csv_content = csv.file.read()  # Read the content of the uploaded CSV file
@@ -61,3 +64,27 @@ def csv_upload(
         )
     client.get_table(table_name)
     return "Upload was successful"
+
+
+@app.post("/query/")
+def query(
+    gcloud_service_api_key: Annotated[str, Form()],
+    csv_id: Annotated[str, Form()],
+    query: Annotated[str, Form()]
+):
+    client = bigquery.Client(
+        client_options={
+            "quota_project_id": "omniproject-51",
+            "api_key": gcloud_service_api_key,
+        }
+    )
+    run_query = client.query(query)
+    try:
+        run_query.result()
+    except:
+        raise HTTPException(
+            status_code=400, detail="Query failed to execute"
+        )
+    rows = run_query.result()
+    # rows = list(data)
+    return rows
