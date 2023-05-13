@@ -1,6 +1,6 @@
 # API - AIzaSyDQTfAOLcUNuKOOSS7gI1aZ9ylfwGivupw
-from fastapi import FastAPI, UploadFile, HTTPException, Form
-from pydantic import BaseModel
+from fastAPI import FastAPI, UploadFile, HTTPException, Form
+# from pydantic import BaseModel
 from google.cloud import storage, bigquery
 from typing import Annotated
 
@@ -8,14 +8,18 @@ app = FastAPI()
 client = bigquery.Client()
 
 
-class CSV(BaseModel):
-    # Service account key for Google Cloud authentication
-    gcloud_service_account_key: str
-    csv_id: str  # ID associated with the uploaded CSV file
+# class CSV(BaseModel):
+# Service account key for Google Cloud authentication
+#   gcloud_service_account_key: str
+#    csv_id: str  # ID associated with the uploaded CSV file
 
 
 @app.post("/uploadfile/")
-def upload_file(csv_upload: CSV, csv: UploadFile = File(...)):
+def csv_upload(
+    gcloud_service_api_key: Annotated[str, Form()],
+    csv_id: Annotated[str, Form()],
+    csv: UploadFile,
+):
 
     csv_content = csv.file.read()  # Read the content of the uploaded CSV file
 
