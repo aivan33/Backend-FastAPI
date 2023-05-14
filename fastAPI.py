@@ -1,10 +1,8 @@
 # API - AIzaSyDQTfAOLcUNuKOOSS7gI1aZ9ylfwGivupw
-from fastapi import File, UploadFile, Form, HTTPException
-# from pydantic import BaseModel
+from fastapi import FastAPI, UploadFile, HTTPException, Form
 from google.cloud import storage, bigquery
 from typing import Annotated
-import sys
-print(sys.path)
+
 app = FastAPI()
 client = bigquery.Client()
 
@@ -21,7 +19,6 @@ def csv_upload(
     gcloud_service_api_key: Annotated[str, Form()],
     csv_id: Annotated[str, Form()],
     csv: UploadFile,
-    query: str
 ):
 
     csv_content = csv.file.read()  # Read the content of the uploaded CSV file
@@ -33,7 +30,7 @@ def csv_upload(
 # Initialize the Google Cloud Storage client with the provided service account key
     storage_client = storage.Client(client_options={
         "quota_project_id": "omniproject-51",
-        "api_key": csv_upload.gcloud_service_account_key,
+        "api_key": gcloud_service_api_key,
     })
     bucket_name = storage_client.bucket("api_tester")  # Specify target bucket
     # Create a blob for the uploaded file
