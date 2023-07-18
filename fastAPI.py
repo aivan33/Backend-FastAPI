@@ -1,87 +1,35 @@
-# API - AIzaSyDQTfAOLcUNuKOOSS7gI1aZ9ylfwGivupw
-from fastapi import FastAPI, UploadFile, HTTPException, Form
-from google.cloud import storage, bigquery
-from typing import Annotated
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from google.cloud import storage
+from google.cloud import bigquery
+import pandas as pd
+import os
 
+# Initialize FastAPI
 app = FastAPI()
-client = bigquery.Client()
 
+# Set up Google Cloud Storage and BigQuery Clients
+storage_client = storage.Client.from_service_account_json('path_to_your_service_account_file.json')
+bigquery_client = bigquery.Client.from_service_account_json('path_to_your_service_account_file.json')
 
-# class CSV(BaseModel):
-# Service account key for Google Cloud authentication
-#    gcloud_service_account_key: Annotated[str, Form()]
+# Google Cloud Storage Bucket Name
+bucket_name = "your_bucket_name"
 
-#    csv_id: str  # ID associated with the uploaded CSV file
+def save_file_to_gcs(file: UploadFile, filename: str):
+    """Saves the file to Google Cloud Storage"""
+    bucket = storage_client.get_bucket(bucket_name)
+    blob = bucket.blob(filename)
+    blob.upload_from_string(file.file.read(), content_type=file.content_type)
 
+def read_file_from_gcs(filename: str):
+    """Reads the file from Google Cloud Storage"""
+    bucket = storage_client.get_bucket(bucket_name)
+    blob = bucket.blob(filename)
+    data = blob.download_as_text()
+    return data
 
-@app.post("/uploadfile/")
-def csv_upload(
-    gcloud_service_api_key: Annotated[str, Form()],
-    csv_id: Annotated[str, Form()],
-    csv: UploadFile,
-):
-
-    csv_content = csv.file.read()  # Read the content of the uploaded CSV file
-
-    if not csv.filename.endswith('.csv'):
-        raise HTTPException(
-            status_code=400, detail="The uploaded file is not a CSV")
-
-# Initialize the Google Cloud Storage client with the provided service account key
-    storage_client = storage.Client(client_options={
-        "quota_project_id": "omniproject-51",
-        "api_key": gcloud_service_api_key,
-    })
-    bucket_name = storage_client.bucket("api_tester")  # Specify target bucket
-    # Create a blob for the uploaded file
-    blob = bucket_name.blob(csv_upload.csv_id)
-
-    blob.upload_from_string(csv_content)  # Upload the file to the bucket
-
-    # Construct BigQuery table
-    table_name = csv.filename[:-4]  # Use CSV filename as the table name
-    dataset_id = "api_tester"  # Specify target dataset
-
-    job_config = bigquery.LoadJobConfig(
-        autodetect=True,  # Detect the schema based on the CSV file
-        # skip_leading_rows = 1,
-        source_format=bigquery.SourceFormat.CSV
-
-    )
-    # Used Bobi's code as ref
-    uri = f"gs://api_tester/{csv_id}"
-    load_job = client.load_table_from_uri(
-        uri, table_name, job_config=job_config)
-
-    try:
-        load_job.result()
-    except:
-        raise HTTPException(
-            status_code=400, detail="CSV file has incosistencies or is not a CSV"
-        )
-    client.get_table(table_name)
-    return "Upload was successful"
-
-
-@app.post("/query/")
-def query(
-    gcloud_service_api_key: Annotated[str, Form()],
-    csv_id: Annotated[str, Form()],
-    query: Annotated[str, Form()]
-):
-    client = bigquery.Client(
-        client_options={
-            "quota_project_id": "omniproject-51",
-            "api_key": gcloud_service_api_key,
-        }
-    )
-    run_query = client.query(query)
-    try:
-        run_query.result()
-    except:
-        raise HTTPException(
-            status_code=400, detail="Query failed to execute"
-        )
-    rows = run_query.result()
-    # rows = list(data)
-    return rows
+def read_csv_and_run_query(csv_data: str, table_name: str):
+    """Reads the CSV data and runs the BigQuery"""
+    df = pd.read_csv(pd.compat.StringIO(csv_data))
+    query = build_query(df, table_name)
+    result = bigquery_client.query(query)
+    return result.to_dataframe()
